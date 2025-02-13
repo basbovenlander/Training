@@ -1,0 +1,61 @@
+import requests
+import pandas as pd
+from supabase import create_client, Client
+
+# Define the URL and the Bearer token for your source API (Simple Books API)
+url = 'https://simple-books-api.glitch.me/orders'
+headers = {
+    'Authorization': 'Bearer d446321aeb6c9be5158bb66f63ca076b259e6ac071ddb8d0f335e895d7cdc4d9'
+}
+
+# Send GET request to the API
+response = requests.get(url, headers=headers)
+
+# Check if the request was successful (status code 200)
+if response.status_code == 200:
+    # Get the JSON response
+    data = response.json()
+    
+    # Convert JSON data to a pandas DataFrame
+    df = pd.json_normalize(data)
+
+    # Define your Supabase URL and API Key
+    supabase_url = 'https://fuieadgoecnppwpwipav.supabase.co'  # Replace with your Supabase URL
+    supabase_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1aWVhZGdvZWNucHB3cHdpcGF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0Mzk2NjgsImV4cCI6MjA1NTAxNTY2OH0.M2xaoBIbsfiUKah3VeLD13yOckrJeTmEju2G1efOzks'  # Replace with your Supabase API Key
+
+    # Create a Supabase client
+    supabase: Client = create_client(supabase_url, supabase_key)
+
+    # Loop through the DataFrame and insert data into Supabase
+    for index, row in df.iterrows():
+        # Convert timestamp (milliseconds) to seconds for storage as an int
+        timestamp = int(row["timestamp"] / 1000)  # Convert milliseconds to seconds (as integer)
+
+        # Check if the 'id' already exists in the database
+        existing_record = supabase.table('orders').select('id').eq('id', row["id"]).execute()
+
+        if existing_record.data:
+            # Skip insertion if 'id' already exists
+            print(f"ID {row['id']} already exists, skipping insertion.")
+            continue
+
+        # Define the data to insert into Supabase
+        data = {
+            "id": row["id"],  # Assuming 'id' is a column in your data
+            "bookId": row["bookId"],
+            "customerName": row["customerName"],
+            "createdBy": row["createdBy"],
+            "quantity": row["quantity"],
+            "timestamp": timestamp  # Insert the integer timestamp
+        }
+
+        # Insert the data into the 'orders' table (replace 'orders' with your actual table name)
+        insert_response = supabase.table('orders').insert(data).execute()
+
+        # Print the response from Supabase
+        print(f"Inserted row {index + 1}: {insert_response}")
+    
+    print(f"Data successfully inserted into Supabase.")
+
+else:
+    print(f"Failed to retrieve data. Status code: {response.status_code}")
